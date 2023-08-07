@@ -479,17 +479,27 @@ class pDeepModel(model_interface.ModelInterface):
         predicts:np.ndarray,
         **kwargs,
     ):
+        # TODO move this somewhere more appropriate?
+        if 'pep_ind' not in self.predict_df:
+            self.predict_df.insert(0, 'pep_ind', np.nan)
+        if 'cleave_ind' not in self.predict_df: 
+            self.predict_df.insert(1, 'cleave_ind', np.nan)
+
         apex_intens = predicts.reshape((len(batch_df), -1)).max(axis=1)
         apex_intens[apex_intens<=0] = 1
         predicts /= apex_intens.reshape((-1,1,1))
         predicts[predicts<self.min_inten] = 0.0
         if self._predict_in_order:
-            self.predict_df.values[
+            self.predict_df.iloc[
                 batch_df.frag_start_idx.values[0]:
                 batch_df.frag_stop_idx.values[-1], 
-            :] = predicts.reshape(
+            2:] = predicts.reshape(
                     (-1, len(self.charged_frag_types))
                 )
+            for i, row in batch_df.iterrows():
+                self.predict_df.iloc[row.frag_start_idx:row.frag_stop_idx, 0] = i
+                self.predict_df.iloc[row.frag_start_idx:row.frag_stop_idx, 1] = list(range(1, (row.frag_stop_idx-row.frag_start_idx)+1))
+            
         else:
             update_sliced_fragment_dataframe(
                 self.predict_df,
